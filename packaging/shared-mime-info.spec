@@ -11,8 +11,6 @@ Source2:        macros.shared-mime-info
 BuildRequires:  intltool
 # needed for xmllint
 BuildRequires:  libxml2-tools
-# Only needed because we don't (and won't) support building xz tarballs by default... See bnc#697467
-BuildRequires:  xz
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(libxml-2.0)
 Requires:       /usr/bin/fgrep
@@ -23,7 +21,6 @@ Requires:       /usr/bin/rm
 #!BuildIgnore:  shared-mime-info
 # needed by update-mime-database
 Provides:       %{name}-devel = %{version}
-BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
 This package contains:
@@ -38,8 +35,9 @@ This package contains:
 %setup -q
 
 %build
-%configure
-make
+export CFLAGS=`echo $RPM_OPT_FLAGS |sed -e 's/atom/i686/g'`
+%configure 
+make V=1
 
 %install
 %make_install
@@ -47,6 +45,7 @@ install %{SOURCE1} %{buildroot}%{_bindir}/
 %find_lang %{name} %{?no_lang_C}
 # Install rpm macros
 install -D -m644 %{SOURCE2} %{buildroot}%{_sysconfdir}/rpm/macros.shared-mime-info
+
 
 %post
 %{_bindir}/update-mime-database %{_datadir}/mime || true
@@ -57,7 +56,7 @@ install -D -m644 %{SOURCE2} %{buildroot}%{_sysconfdir}/rpm/macros.shared-mime-in
 
 %files
 %defattr (-, root, root)
-%doc COPYING
+%license COPYING
 %{_bindir}/*
 %{_datadir}/mime/packages/*.xml
 %{_datadir}/pkgconfig/*.pc
