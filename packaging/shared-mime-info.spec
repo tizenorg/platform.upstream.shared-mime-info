@@ -28,6 +28,13 @@ This package contains:
 
 - The update-mime-database command, used to install new MIME data.
 
+%package tools
+Summary:    Tools supporting shared-mime-info 
+Requires:   shared-mime-info
+
+%description tools
+Tools to support packages %{name}
+
 %prep
 %setup -q
 
@@ -54,10 +61,14 @@ install -D -m644 %{SOURCE2} %{buildroot}%{_sysconfdir}/rpm/macros.shared-mime-in
 %files
 %defattr (-, root, root)
 %license COPYING
-%{_bindir}/*
+%{_bindir}/update-mime-database
 %{_datadir}/mime/packages/*.xml
 %{_datadir}/pkgconfig/*.pc
 %ghost %{_datadir}/mime/[a-ms-vxX]*
 %{_sysconfdir}/rpm/macros.shared-mime-info
+
+
+%files tools
+%{_bindir}/mime-info-to-mime
 
 %changelog
