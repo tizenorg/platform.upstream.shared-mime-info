@@ -1,3 +1,6 @@
+* Tue Mar 19 2013 Anas Nashif <anas.nashif@intel.com> submit/trunk/20130319.030748@6857ae6
+- Split package to avoid perl dependency
+
 * Mon Mar 18 2013 Anas Nashif <anas.nashif@intel.com> upstream/1.0@b4e3100
 - Fixed package groups
 
