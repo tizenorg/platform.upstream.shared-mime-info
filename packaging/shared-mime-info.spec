@@ -4,7 +4,7 @@ Release:        0
 License:        GPL-2.0+
 Summary:        Shared MIME Database
 Url:            http://freedesktop.org/wiki/Software/shared-mime-info
-Group:          System/Base
+Group:          Base/Configuration
 Source:         http://people.freedesktop.org/~hadess/%{name}-%{version}.tar.xz
 Source1:        mime-info-to-mime
 Source2:        macros.shared-mime-info
