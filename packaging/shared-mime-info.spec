@@ -8,6 +8,7 @@ Group:          Base/Configuration
 Source:         http://people.freedesktop.org/~hadess/%{name}-%{version}.tar.xz
 Source1:        mime-info-to-mime
 Source2:        macros.shared-mime-info
+Source1001: 	shared-mime-info.manifest
 BuildRequires:  intltool
 BuildRequires:  libxml2-tools
 BuildRequires:  pkgconfig(glib-2.0)
@@ -37,6 +38,7 @@ Tools to support packages %{name}
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 %build
 export CFLAGS=`echo $RPM_OPT_FLAGS |sed -e 's/atom/i686/g'`
@@ -59,6 +61,7 @@ install -D -m644 %{SOURCE2} %{buildroot}%{_sysconfdir}/rpm/macros.shared-mime-in
 %docs_package
 
 %files
+%manifest %{name}.manifest
 %defattr (-, root, root)
 %license COPYING
 %{_bindir}/update-mime-database
@@ -69,6 +72,7 @@ install -D -m644 %{SOURCE2} %{buildroot}%{_sysconfdir}/rpm/macros.shared-mime-in
 
 
 %files tools
+%manifest %{name}.manifest
 %{_bindir}/mime-info-to-mime
 
 %changelog
