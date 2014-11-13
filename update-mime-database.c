@@ -16,6 +16,7 @@
 #include <libxml/tree.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fcntl.h>
 
 #define XML_NS XML_XML_NAMESPACE
 #define XMLNS_NS "http://www.w3.org/2000/xmlns/"
@@ -178,6 +179,17 @@ static void g_log_handler (const gchar   *log_domain,
     }
 }
 
+static void
+fatal_gerror (GError *error) G_GNUC_NORETURN;
+
+static void
+fatal_gerror (GError *error)
+{
+	g_assert(error != NULL);
+	g_printerr("%s\n", error->message);
+	g_error_free(error);
+	exit (EXIT_FAILURE);
+}
 
 static void usage(const char *name)
 {
@@ -819,26 +831,29 @@ static void scan_source_dir(const char *path)
 	g_ptr_array_free(files, TRUE);
 }
 
-/* Save doc as XML as filename, 0 on success or -1 on failure */
-static int save_xml_file(xmlDocPtr doc, const gchar *filename)
+static gboolean save_xml_file(xmlDocPtr doc, const gchar *filename, GError **error)
 {
 #if LIBXML_VERSION > 20400
 	if (xmlSaveFormatFileEnc(filename, doc, "utf-8", 1) < 0)
-		return 1;
+	{
+		g_set_error(error, G_FILE_ERROR, G_FILE_ERROR_FAILED,
+			    "Failed to write XML file; For permission problems, try rerunning as root");
+		return FALSE;
+	}
 #else
 	FILE *out;
 	
-	out = fopen(filename, "w");
+	out = fopen_gerror(filename, error);
 	if (!out)
-		return 1;
+		return FALSE;
 
 	xmlDocDump(out, doc);  /* Some versions return void */
 
-	if (fclose(out))
-		return 1;
+	if (!fclose_gerror(out, error))
+		return FALSE;
 #endif
 
-	return 0;
+	return TRUE;
 }
 
 /* Write out globs for one pattern to the 'globs' file */
@@ -913,26 +928,64 @@ static int compare_glob_by_weight (gpointer a, gpointer b)
 	return bg->weight - ag->weight;
 }
 
-/* Renames pathname by removing the .new extension */
-static void atomic_update(const gchar *pathname)
+static void
+set_error_from_errno (GError **error)
 {
-	gchar *new_name;
+	int errsv = errno;
+	g_set_error_literal(error, G_FILE_ERROR, g_file_error_from_errno(errsv),
+			    g_strerror(errsv));
+}
+
+/* Renames pathname by removing the .new extension */
+static gboolean atomic_update(const gchar *pathname, GError **error)
+{
+	gboolean ret = FALSE;
+	gchar *new_name = NULL;
 	int len;
+	int fd;
 
 	len = strlen(pathname);
 
-	g_return_if_fail(strcmp(pathname + len - 4, ".new") == 0);
+	g_return_val_if_fail(strcmp(pathname + len - 4, ".new") == 0, FALSE);
 
 	new_name = g_strndup(pathname, len - 4);
+
+#ifdef HAVE_FDATASYNC
+	fd = open(pathname, O_RDWR);
+	if (fd == -1)
+	{
+		set_error_from_errno(error);
+		goto out;
+	}
+	if (fdatasync(fd) == -1)
+	{
+		set_error_from_errno(error);
+		goto out;
+	}
+	if (close(fd) == -1)
+	{
+		set_error_from_errno(error);
+		goto out;
+	}
+#endif
 
 #ifdef _WIN32
 	/* we need to remove the old file first! */
 	remove(new_name);
 #endif
-	if (rename(pathname, new_name))
-		g_warning("Failed to rename %s as %s , errno: %d", pathname, new_name, errno);
+	if (rename(pathname, new_name) == -1)
+	{
+		int errsv = errno;
+		g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(errsv),
+			    "Failed to rename %s as %s: %s", pathname, new_name,
+			    g_strerror(errsv));
+		goto out;
+	}
 
+	ret = TRUE;
+out:
 	g_free(new_name);
+	return ret;
 }
 
 /* Write out an XML file for one type */
@@ -941,22 +994,29 @@ static void write_out_type(gpointer key, gpointer value, gpointer data)
 	Type *type = (Type *) value;
 	const char *mime_dir = (char *) data;
 	char *media, *filename;
+	GError *local_error = NULL;
+	char *lower;
 
-	media = g_strconcat(mime_dir, "/", type->media, NULL);
+	lower = g_ascii_strdown(type->media, -1);
+	media = g_strconcat(mime_dir, "/", lower, NULL);
+	g_free(lower);
 #ifdef _WIN32
 	mkdir(media);
 #else
 	mkdir(media, 0755);
 #endif
 
-	filename = g_strconcat(media, "/", type->subtype, ".xml.new", NULL);
+	lower = g_ascii_strdown(type->subtype, -1);
+	filename = g_strconcat(media, "/", lower, ".xml.new", NULL);
+	g_free(lower);
 	g_free(media);
 	media = NULL;
 
-	if (save_xml_file(type->output, filename) != 0)
-		g_warning("Failed to write out '%s'", filename);
+	if (!save_xml_file(type->output, filename, &local_error))
+		fatal_gerror(local_error);
 
-	atomic_update(filename);
+	if (!atomic_update(filename, &local_error))
+		fatal_gerror(local_error);
 
 	g_free(filename);
 }
@@ -3427,17 +3487,31 @@ write_cache (FILE *cache)
 
 
 static FILE *
-open_or_die(const char *filename)
+fopen_gerror(const char *filename, GError **error)
 {
 	FILE *stream = fopen(filename, "wb");
 
 	if (!stream)
-	{
-		g_printerr("Failed to open '%s' for writing\n", filename);
-		exit(EXIT_FAILURE);
-	}
+		set_error_from_errno(error);
 
 	return stream;
+}
+
+static gboolean
+fclose_gerror(FILE *f, GError **error)
+{
+	int err = ferror(f);
+	if (err != 0)
+	{
+		set_error_from_errno(error);
+		return FALSE;
+	}
+	if (fclose(f) != 0)
+	{
+		set_error_from_errno(error);
+		return FALSE;
+	}
+	return TRUE;
 }
 
 int main(int argc, char **argv)
@@ -3445,6 +3519,8 @@ int main(int argc, char **argv)
 	char *mime_dir = NULL;
 	char *package_dir = NULL;
 	int opt;
+	GError *local_error = NULL;
+	GError **error = &local_error;
 
 	/* Install the filtering log handler */
 	g_log_set_default_handler(g_log_handler, NULL);
@@ -3501,13 +3577,6 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	if (access(mime_dir, W_OK))
-	{
-		g_warning(_("%s: I don't have write permission on %s. "
-			     "Try rerunning me as root."), argv[0], mime_dir);
-		return EXIT_FAILURE;
-	}
-
 	g_message("Updating MIME database in %s...\n", mime_dir);
 
 	if (access(package_dir, F_OK))
@@ -3549,23 +3618,31 @@ int main(int argc, char **argv)
 		g_hash_table_foreach(globs_hash, collect_glob2, &glob_list);
 		glob_list = g_list_sort(glob_list, (GCompareFunc)compare_glob_by_weight);
 		globs_path = g_strconcat(mime_dir, "/globs.new", NULL);
-		globs = open_or_die(globs_path);
+		globs = fopen_gerror(globs_path, error);
+		if (!globs)
+			goto out;
 		g_fprintf(globs,
 			  "# This file was automatically generated by the\n"
 			  "# update-mime-database command. DO NOT EDIT!\n");
 		write_out_glob(glob_list, globs);
-		fclose(globs);
-		atomic_update(globs_path);
+		if (!fclose_gerror(globs, error))
+			goto out;
+		if (!atomic_update(globs_path, error))
+			goto out;
 		g_free(globs_path);
 
 		globs_path = g_strconcat(mime_dir, "/globs2.new", NULL);
-		globs = open_or_die(globs_path);
+		globs = fopen_gerror(globs_path, error);
+		if (!globs)
+			goto out;
 		g_fprintf(globs,
 			  "# This file was automatically generated by the\n"
 			  "# update-mime-database command. DO NOT EDIT!\n");
 		write_out_glob2 (glob_list, globs);
-		fclose(globs);
-		atomic_update(globs_path);
+		if (!fclose_gerror(globs, error))
+			goto out;
+		if (!atomic_update(globs_path, error))
+			goto out;
 		g_free(globs_path);
 
 		g_list_free (glob_list);
@@ -3576,7 +3653,9 @@ int main(int argc, char **argv)
 		char *magic_path;
 		int i;
 		magic_path = g_strconcat(mime_dir, "/magic.new", NULL);
-		stream = open_or_die(magic_path);
+		stream = fopen_gerror(magic_path, error);
+		if (!stream)
+			goto out;
 		fwrite("MIME-Magic\0\n", 1, 12, stream);
 
 		if (magic_array->len)
@@ -3587,9 +3666,10 @@ int main(int argc, char **argv)
 
 			write_magic(stream, magic);
 		}
-		fclose(stream);
-
-		atomic_update(magic_path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(magic_path, error))
+			goto out;
 		g_free(magic_path);
 	}
 
@@ -3598,11 +3678,14 @@ int main(int argc, char **argv)
 		char *ns_path;
 
 		ns_path = g_strconcat(mime_dir, "/XMLnamespaces.new", NULL);
-		stream = open_or_die(ns_path);
+		stream = fopen_gerror(ns_path, error);
+		if (!stream)
+			goto out;
 		write_namespaces(stream);
-		fclose(stream);
-
-		atomic_update(ns_path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(ns_path, error))
+			goto out;
 		g_free(ns_path);
 	}
 	
@@ -3611,11 +3694,14 @@ int main(int argc, char **argv)
 		char *path;
 		
 		path = g_strconcat(mime_dir, "/subclasses.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		write_subclasses(stream);
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3624,11 +3710,14 @@ int main(int argc, char **argv)
 		char *path;
 		
 		path = g_strconcat(mime_dir, "/aliases.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		write_aliases(stream);
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3637,11 +3726,14 @@ int main(int argc, char **argv)
 		char *path;
 		
 		path = g_strconcat(mime_dir, "/types.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		write_types(stream);
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3650,11 +3742,14 @@ int main(int argc, char **argv)
 		char *icon_path;
 
 		icon_path = g_strconcat(mime_dir, "/generic-icons.new", NULL);
-		stream = open_or_die(icon_path);
+		stream = fopen_gerror(icon_path, error);
+		if (!stream)
+			goto out;
 		write_icons(generic_icon_hash, stream);
-		fclose(stream);
-
-		atomic_update(icon_path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(icon_path, error))
+			goto out;
 		g_free(icon_path);
 	}
 
@@ -3663,11 +3758,14 @@ int main(int argc, char **argv)
 		char *icon_path;
 
 		icon_path = g_strconcat(mime_dir, "/icons.new", NULL);
-		stream = open_or_die(icon_path);
+		stream = fopen_gerror(icon_path, error);
+		if (!stream)
+			goto out;
 		write_icons(icon_hash, stream);
-		fclose(stream);
-
-		atomic_update(icon_path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(icon_path, error))
+			goto out;
 		g_free(icon_path);
 	}
 
@@ -3676,7 +3774,9 @@ int main(int argc, char **argv)
 		char *path;
 		int i;
 		path = g_strconcat(mime_dir, "/treemagic.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		fwrite("MIME-TreeMagic\0\n", 1, 16, stream);
 
 		if (tree_magic_array->len)
@@ -3687,9 +3787,10 @@ int main(int argc, char **argv)
 
 			write_tree_magic(stream, magic);
 		}
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3698,11 +3799,14 @@ int main(int argc, char **argv)
 		char *path;
 		
 		path = g_strconcat(mime_dir, "/mime.cache.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		write_cache(stream);
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3711,12 +3815,15 @@ int main(int argc, char **argv)
 		char *path;
 
 		path = g_strconcat(mime_dir, "/version.new", NULL);
-		stream = open_or_die(path);
+		stream = fopen_gerror(path, error);
+		if (!stream)
+			goto out;
 		g_fprintf(stream,
 			  VERSION "\n");
-		fclose(stream);
-
-		atomic_update(path);
+		if (!fclose_gerror(stream, error))
+			goto out;
+		if (!atomic_update(path, error))
+			goto out;
 		g_free(path);
 	}
 
@@ -3735,5 +3842,8 @@ int main(int argc, char **argv)
 
 	check_in_path_xdg_data(mime_dir);
 
+out:
+	if (local_error != NULL)
+		fatal_gerror(local_error);
 	return EXIT_SUCCESS;
 }

@@ -1,3 +1,6 @@
+Note: latest version of this file is at:
+http://cgit.freedesktop.org/xdg/shared-mime-info/tree/HACKING
+
 A few ground rules for people interested in adding new mime-types.
 
 * Mime-types used should be IANA registered mime-types when possible
@@ -54,6 +57,9 @@ indicates expected success. Trailing "o"s can be omitted.
 
 See the top of the tests/list file for syntax details.
 
+You can also temporarily print the results of test-mime-data by putting your
+test files in the staging-tests/ sub-directory.
+
 [1]: Repository details at:
 http://cgit.freedesktop.org/xdg/xdgmime/
 
@@ -67,7 +73,7 @@ Releasing
 Updating the spec on the website
 --------------------------------
 
-- On gabe, go in /srv/specifications.freedesktop.org/www
-- Edit specs.idx
-- Run ../update.py
+- update http://cgit.freedesktop.org/xdg/xdg-specs/tree/web-export/specs.idx
+- go to /srv/specifications.freedesktop.org/www on gabe
+- run ../update.py
 

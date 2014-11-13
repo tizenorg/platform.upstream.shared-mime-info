@@ -236,6 +236,12 @@ is trivial to detect a pattern in the form '*.ext' and store it in an
 extension hash table internally. The full power of regular expressions was
 not being used by either desktop, and glob patterns are more suitable for
 filename matching anyway.
+		</para>
+		<para>
+The first glob element represents the "main" extension for the file type.
+While this doesn't affect the mimetype matching algorithm, this information can be useful
+when a single main extension is needed for a mimetype, for instance so that applications
+can choose an appropriate extension when saving a file.
 				</para></listitem>
 				<listitem><para>
 A <userinput>glob-deleteall</userinput> element, which indicates that patterns from
@@ -319,7 +325,7 @@ to provide the text in multiple languages.
 <userinput>acronym</userinput> elements give experienced users a terse idea of the document contents.
 for example "ODS", "GEDCOM", "JPEG" and "XML".
 There may be many of these elements with different <userinput>xml:lang</userinput> attributes
-to provide the text in multiple languages, although these should only be used if absolutely neccessary.
+to provide the text in multiple languages, although these should only be used if absolutely necessary.
 				</para></listitem>
 				<listitem><para>
 <userinput>expanded-acronym</userinput> elements are the expanded versions of the acronym elements,
@@ -327,7 +333,7 @@ for example "OpenDocument Spreadsheet", "GEnealogical Data COMmunication", and "
 The purpose of these elements is to provide users a way to look up information on various MIME types or
 file formats in third-party resources.
 There may be many of these elements with different <userinput>xml:lang</userinput> attributes
-to provide the text in multiple languages, although these should only be used if absolutely neccessary.
+to provide the text in multiple languages, although these should only be used if absolutely necessary.
 				</para></listitem>
 				<listitem><para>
 <userinput>icon</userinput> elements specify the icon to be used for this particular mime-type, given
@@ -847,8 +853,8 @@ implementations MUST NOT rely on this method being available.
 		<title>Subclassing</title>
 		<para>
 A type is a subclass of another type if any instance of the first type is
-also an instance of the second. For example, all image/svg files are also
-text/xml, text/plain and application/octet-stream files. Subclassing is about
+also an instance of the second. For example, all image/svg+xml files are also
+application/xml, text/plain and application/octet-stream files. Subclassing is about
 the format, rather than the category of the data (for example, there is no
 'generic spreadsheet' class that all spreadsheets inherit from).
 		</para>
@@ -873,7 +879,7 @@ former).
 		<para>
 Some types may or may not be instances of other types. For example, a
 spreadsheet file may be compressed or not. It is a valid spreadsheet file
-either way, but only inherits from application/x-gzip in one case. This
+either way, but only inherits from application/gzip in one case. This
 information cannot be represented statically; instead an application
 interested in this information should run all of the magic rules, and
 use the list of types returned as the subclasses.
@@ -977,7 +983,7 @@ are x-content/audio-dvd, x-content/blank-cd or x-content/image-dcf.
 		<para>
 Matching of content types works with <userinput>treemagic</userinput> elements, which 
 are analogous to the <userinput>magic</userinput> elements used for MIME type matching.
-Instead of looking for byte sequences in files, <userinput>treemagic</userinput> element
+Instead of looking for byte sequences in files, <userinput>treemagic</userinput> elements
 allow to look for files with certain names, permissions or mime types in a directory
 hierarchy.
 		</para>

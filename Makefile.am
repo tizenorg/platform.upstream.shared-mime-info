@@ -1,6 +1,6 @@
 SUBDIRS=. po
 
-INCLUDES = $(ALL_CFLAGS)
+AM_CPPFLAGS = $(ALL_CFLAGS)
 
 packagesdir = $(datadir)/mime/packages
 packages_DATA = freedesktop.org.xml
@@ -46,9 +46,15 @@ $(pkgconfig_DATA): config.status
 @INTLTOOL_XML_RULE@
 @INTLTOOL_DESKTOP_RULE@
 
+if CROSS_COMPILING
+  update_mime_database=$(UPDATE_MIME_DATABASE)
+else
+  update_mime_database="$(top_builddir)/update-mime-database$(EXEEXT)"
+endif
+
 install-data-hook: install-binPROGRAMS
 if ENABLE_UPDATE_MIMEDB
-	$(DESTDIR)"$(bindir)/update-mime-database" -V "$(DESTDIR)$(datadir)/mime"
+	$(update_mime_database) -V "$(DESTDIR)$(datadir)/mime"
 endif
 
 uninstall-hook:
@@ -68,26 +74,53 @@ uninstall-hook:
 	rm -f "$(DESTDIR)$(datadir)/mime/types"
 	rm -f "$(DESTDIR)$(datadir)/mime/version"
 
-all: check create-pot
+defaultmakedeps=create-pot
+if ENABLE_DEFAULT_MAKE_CHECK
+defaultmakedeps += check
+endif
+
+all: $(defaultmakedeps)
 
 create-pot:
 	$(AM_V_GEN) $(MAKE) -C po shared-mime-info.pot
 
-check: create-pot freedesktop.org.xml update-mime-database check-translations
+local-test: create-pot freedesktop.org.xml update-mime-database$(EXEEXT)
+if CROSS_COMPILING
+	@echo "Cross compiling: Skipping checks"
+else
+	@if ! test -d staging-tests/ ; then \
+		echo "***************************************************************************" ; \
+		echo "*** Add your file to process to staging-tests/ and run local-test again ***" ; \
+		echo "***************************************************************************" ; \
+		exit 1 ; \
+	fi
+	if test -d .git/ && test -x ../xdgmime/src/print-mime-data$(EXEEXT) ; then \
+		mkdir -p $(top_builddir)/temp-mime-dir/mime/packages ; \
+		cp -a $(top_builddir)/freedesktop.org.xml $(top_builddir)/temp-mime-dir/mime/packages/ ; \
+		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" $(top_builddir)/update-mime-database$(EXEEXT) "$(top_builddir)/temp-mime-dir/mime/" ; \
+		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" XDG_DATA_HOME="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/print-mime-data$(EXEEXT) staging-tests/; \
+		rm -rf "$(top_builddir)/temp-mime-dir/" ; \
+	fi
+endif
+
+check: create-pot freedesktop.org.xml update-mime-database$(EXEEXT) check-translations
+if CROSS_COMPILING
+	@echo "Cross compiling: Skipping checks"
+else
 	if test -e $(top_builddir)/freedesktop.org.xml; then \
 		xmllint --noout --valid $(top_builddir)/freedesktop.org.xml || exit 1;	\
 	else \
 		xmllint --noout --valid $(top_srcdir)/freedesktop.org.xml || exit 1;	\
 	fi; \
-	if test -d .git/ && test -x $(top_builddir)/update-mime-database && test -d $(top_srcdir)/mime-db-tests ; then \
-		$(top_builddir)/update-mime-database mime-db-tests/ ; \
+	if test -d .git/ && test -x $(top_builddir)/update-mime-database$(EXEEXT) && test -d $(top_srcdir)/mime-db-tests ; then \
+		$(top_builddir)/update-mime-database$(EXEEXT) mime-db-tests/ ; \
 	fi
-	if test -d .git/ && test -x ../xdgmime/src/test-mime-data && test -x $(top_builddir)/test-tree-magic ; then \
+	if test -d .git/ && test -x ../xdgmime/src/test-mime-data$(EXEEXT) && test -x $(top_builddir)/test-tree-magic$(EXEEXT) ; then \
 		mkdir -p $(top_builddir)/temp-mime-dir/mime/packages ; \
 		cp -a $(top_builddir)/freedesktop.org.xml $(top_builddir)/temp-mime-dir/mime/packages/ ; \
-		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" $(top_builddir)/update-mime-database "$(top_builddir)/temp-mime-dir/mime/" ; \
-		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" XDG_DATA_HOME="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/test-mime-data -v tests/list || (XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/test-mime-data -v -v tests/list ; exit 1); \
-		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" $(top_builddir)/test-tree-magic tests/tree-list || exit 1; \
+		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" $(top_builddir)/update-mime-database$(EXEEXT) "$(top_builddir)/temp-mime-dir/mime/" ; \
+		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" XDG_DATA_HOME="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/test-mime-data$(EXEEXT) -v tests/list || XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" XDG_DATA_HOME="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/test-mime$(EXEEXT) || (XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" ../xdgmime/src/test-mime-data$(EXEEXT) -v -v tests/list ; exit 1); \
+		XDG_DATA_DIRS="$(top_builddir)/temp-mime-dir/" $(top_builddir)/test-tree-magic$(EXEEXT) tests/tree-list || exit 1; \
 		rm -rf "$(top_builddir)/temp-mime-dir/" ; \
 	fi
 	@if `grep comment $(srcdir)/freedesktop.org.xml.in | grep -v _comment | grep -q -v '<!'` ; then \
@@ -98,10 +131,11 @@ check: create-pot freedesktop.org.xml update-mime-database check-translations
 	fi
 	@echo Number of mime-types that might need generic-icon: `grep "mime-type type=" $(srcdir)/freedesktop.org.xml.in | grep -v video/ | grep -v image/ | grep -v text/ | grep -v audio/ | grep -v "octet-stream" | wc -l` ; \
 	echo Number of mime-types with a generic icon: `grep "generic-icon name=" $(srcdir)/freedesktop.org.xml.in | wc -l` ;
+endif
 
 check-translations:
 	@for i in $(top_srcdir)/po/*.po ; do								\
-		if ! grep -q `basename $$i | sed 's,.po,,'` $(top_srcdir)/po/LINGUAS ; then		\
+		if ! grep -q ^`basename $$i | sed 's,.po,,'`$$ $(top_srcdir)/po/LINGUAS ; then		\
 			echo '***' `basename $$i | sed 's,.po,,'` missing from po/LINGUAS '***' ;	\
 			exit 1;										\
 		fi;											\

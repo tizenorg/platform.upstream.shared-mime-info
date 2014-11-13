@@ -1,3 +1,119 @@
+shared-mime-info 1.3 (2014-04-08)
+* Mime-type changes:
+- Add Aliases for OpenOffice Base and StarWriter
+- Add Apple Keynote 5 mime-type
+- Add mimetype for compressed FictionBook2
+- Don't recognize all .asc files as application/pgp-encrypted
+- Add tree magic for the Kindle e-book reader
+- Add LZ4 archive type
+- Add PC Engine, GameCube and Wii "ROM" types
+- Add audio/x-opus+ogg mime-type
+- Add image/webp mime-type
+- Prefer application/vnd.ms-asf to video/x-ms-asf
+- Add application/x-riff mime-type
+- Add JSON mime-type
+- Add *.jsm glob for Javascript
+- Add magic and glob patterns for compressed x-spss-sav files
+- JavaScript and CSS are not subclasses of text/x-csrc
+- Remove *.CSSL glob for CSS files
+
+* Call g_type_init() only with older glib
+* Fix failures on NetBSD
+* Store MEDIA/SUBTYPE.xml files in lowercase
+
+shared-mime-info 1.2 (2013-09-30)
+* Mime-type changes:
+- Use IANA registered application/sql type for SQL
+- Add test for text/x-python
+- Added *.pyx as Pyrex/Cython variant of text/x-python
+- Lower the priority of the *png glob on Apple PNGs
+- Add magic for Kobo e-book reader
+- Add another magic for EPub books
+- Add missing globs and tests for OpenPGP files
+- Add MIME types for raw disk images
+- Add video/x-matroska-3d mime-type
+- Use application/vnd.adobe.flash.movie for SWF
+- Use application/vnd.nintendo.snes.rom for SNES ROMs, associate *.sfc with them
+- Fix shebang matches for shell scripts
+- Remove *.ogv as a glob for Theora videos as they might not be Theora
+- Improve detection of Perl scripts
+- Add more aliases for Photoshop images
+- Add Microsoft Publisher mime-type
+- Correct JPEG2000 definition
+
+* Check for errors when saving files, and ensure that files
+  are saved to disk before carrying on.
+* Don't use access() to check for writability
+* Rename configure.in to configure.ac
+
+shared-mime-info 1.1 (2012-02-13)
+* Mime-type changes:
+- Add application/x-ccmx
+- Add zz-application/zz-winassoc-* aliases
+- Make application/x-xz-compressed-tar a subclass of application/x-xz
+- Add DTS and DTS-HD mime-types
+- Add test for PPM bug
+- Fix comment and add glob for application/pkcs7-mime
+- Add application/x-qtiplot mime-type
+- Add AMZ (AmazonMP3 Download File) mime-type
+- Add separate mime-type for Apple broken PNGs
+- Add *.mk and *.mak text/x-makefile globs
+- Match application/vnd.palm to IANA standard
+- Use IANA registered application/gzip instead of x-gzip
+- Add application/gml+xml
+- Fix Scream Tracker instrument magic
+- Add application/x-gtk-builder type
+- Add magic for v1 and v2 XCF files
+- Add LZMA test file
+- Fix some globs for OGG files
+- Move *.taz from application/x-compressed-tar to application/x-tarz
+- Add some sub-class-of tags for compressed files
+- Add *.tb2 as a glob for application/x-bzip-compressed-tar
+- Add support for DOS EPS files
+- Add *.ar archives to the test suite
+- Add xlr mime-type
+- Add application/vnd.lotus-wordpro
+- Put bz2 patterns before bz ones for bzip-related mimetypes
+- Add simple magic for text/x-gettext-translation-template
+- Add test case for application/x-gettext-translation
+- Add mime-type for source RPMs
+- Add AMR audio test
+- Add test case for TTF fonts
+- Add Woff font mime-type
+- Add FLTK acronym
+- Add application/ics as an alias for text/calendar
+- Add RAR acronym
+- Add dicomdir glob
+- Add *.di as a glob for D source files
+- Add magic for MNG animations
+- Add magic for PICT v2 images
+- Add JNLP file to the test suite
+- Add support for the AVF AVI container variant
+- Add EMF and WMF aliases
+- Improve magic of uncompressed TGA files
+- Add application/winhlp
+- Add text/x-uuencode
+- Add MHTML mime-type
+- Make the main docbook mime-type be application/x-docbook+xml
+- Add application/x-lzh-compressed as alias to application/x-lha
+- Add IFF super-type
+- Split off the AAC mime-type from the M4A one
+- Add text/x-modelica mime-type
+- Add magic for GNU gettext message catalogs (.mo)
+
+* Specification changes:
+- Fix mimetype names used as examples
+- Document that the first extension is the main one
+- Fix missing plural
+
+* Honor NOCONFIGURE=1
+* Allow builders to not run make check by default
+* Fix build for platforms with executable extensions
+* Disable checks when cross compiling
+* Use non-installed update-mime-database in install-data-hook
+* Use native update-mime-database for install when cross compiling
+* Add a local-test target to print mime info
+
 shared-mime-info 1.0 (2012-01-17)
 * Mime-type changes:
 - Add root-XML for AbiWord, Atom, Dia, Dia shape,
@@ -559,7 +675,7 @@ shared-mime-info 0.15  (2004-08-30)
 
 * add .flac detection.
 
-* make MIME descriptions more consistant with each other (patch from
+* make MIME descriptions more consistent with each other (patch from
   Christian Neumair).
 
 * add a package-config file

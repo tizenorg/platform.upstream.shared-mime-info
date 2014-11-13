@@ -1,4 +1,4 @@
-AC_INIT([shared-mime-info],[1.0],[https://bugs.freedesktop.org/enter_bug.cgi?product=shared-mime-info])
+AC_INIT([shared-mime-info],[1.3],[https://bugs.freedesktop.org/enter_bug.cgi?product=shared-mime-info])
 
 AM_INIT_AUTOMAKE([1.9 foreign no-dist-gzip dist-xz check-news])
 
@@ -19,6 +19,11 @@ IT_PROG_INTLTOOL([0.35.0])
 GETTEXT_PACKAGE=shared-mime-info
 AC_SUBST(GETTEXT_PACKAGE)
 AM_GLIB_GNU_GETTEXT
+
+AC_CHECK_FUNCS(fdatasync)
+
+dnl Check for cross compiling
+AM_CONDITIONAL(CROSS_COMPILING, test $cross_compiling = yes)
 
 dnl Check whether libxml and glib are present is installed
 PKG_CHECK_MODULES(ALL, \
@@ -42,10 +47,25 @@ if test "x$GCC" = "xyes"; then
 fi
 ]
 
+AC_ARG_ENABLE(default-make-check,
+   AC_HELP_STRING([--disable-default-make-check],
+                   [run make check by default [default=yes]]),,
+    enable_default_make_check=yes)
+AM_CONDITIONAL(ENABLE_DEFAULT_MAKE_CHECK, test x$enable_default_make_check = xyes)
+
 AC_ARG_ENABLE(update-mimedb,
    AC_HELP_STRING([--disable-update-mimedb],
                    [disable the update-mime-database after install [default=no]]),,
     enable_update_mimedb=yes)
+
+if test $cross_compiling = yes && test x$enable_update_mimedb = xyes; then
+  AC_PATH_PROG(UPDATE_MIME_DATABASE, update-mime-database, no)
+  if test x$UPDATE_MIME_DATABASE = xno; then
+    enable_update_mimedb=no
+    AC_MSG_WARN(Could not find the update-mime-database program in your PATH. Your mime database will not be updated upon install.)
+  fi
+fi
+
 AM_CONDITIONAL(ENABLE_UPDATE_MIMEDB, test x$enable_update_mimedb = xyes)
 
 AC_PATH_PROG([XMLLINT],[xmllint])
