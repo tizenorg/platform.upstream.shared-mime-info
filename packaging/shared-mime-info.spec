@@ -1,5 +1,5 @@
 Name:           shared-mime-info
-Version:        1.0
+Version:        1.3
 Release:        0
 License:        GPL-2.0+
 Summary:        Shared MIME Database
